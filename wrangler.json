@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangle/config-schema.json",
+  "name": "sinvol-site",
+  "compatibility_date": "2026-11-10",
+  "assets": {
+    "directory": "."
+  }
+}
