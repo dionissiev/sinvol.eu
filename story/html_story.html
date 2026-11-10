@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chain Story Platform</title>
+  
+  <!-- React & React DOM -->
+  <script src="https://unpkg.com" crossorigin></script>
+  <script src="https://unpkg.com" crossorigin></script>
+  
+  <!-- Babel Compiler for JSX -->
+  <script src="https://unpkg.com"></script>
+
+  <!-- Tailwind CSS -->
+  <script src="https://tailwindcss.com"></script>
+
+  <!-- Supabase JS Client Library -->
+  <script src="https://jsdelivr.net"></script>
+
+  <style>
+    :root {
+      --bg: #111827;          
+      --surface: #1f2937;     
+      --surface-2: #374151;   
+      --border: #4b5563;      
+      --text: #f3f4f6;        
+      --text-body: #d1d5db;   
+      --text-muted: #9ca3af;  
+      --text-faint: #4b5563;  
+      --accent: #fbbf24;      
+      --accent-soft: #fde68a; 
+      --success: #a3e635;     
+      --danger: #ef4444;      
+      --danger-text: #f87171; 
+      --radius-card: 12px;
+      --radius-modal: 16px;
+      --radius-btn: 8px;
+      --radius-field: 6px;
+      --radius-pill: 999px;
+      --shadow-modal: 0 16px 48px rgba(0, 0, 0, .65);
+      --overlay: rgba(0, 0, 0, .72);
+      --nav-bg: rgba(17, 24, 39, .92);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 90px;
+    }
+
+    .slovol-card {
+      background: var(--surface);
+      border-radius: var(--radius-card);
+      padding: 16px;
+      border: 2px solid var(--surface-2);
+    }
+
+    .slovol-card.active { border-color: var(--accent); }
+    .slovol-card.complete { border-color: var(--success); }
+
+    .slovol-btn {
+      background: var(--surface-2);
+      color: var(--text);
+      border: none;
+      border-radius: var(--radius-btn);
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .slovol-btn:hover:not(:disabled) { background: var(--border); }
+    .slovol-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .slovol-btn-primary {
+      background: var(--accent);
+      color: #111827;
+      font-weight: 700;
+    }
+
+    .slovol-btn-primary:hover:not(:disabled) { background: #f59e0b; }
+
+    .slovol-input, .slovol-select, .slovol-textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border-radius: var(--radius-field);
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-family: inherit;
+    }
+
+    .slovol-input:focus, .slovol-select:focus, .slovol-textarea:focus, button:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 2px;
+    }
+
+    .slovol-chip {
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: #334155;
+      color: #e5e7eb;
+      border: 1px solid var(--border);
+    }
+
+    .slovol-chip-amber {
+      background: #78350f;
+      color: #fde68a;
+      border-color: #d97706;
+    }
+
+    .slovol-chip-lime {
+      background: #14532d;
+      color: #bef264;
+      border-color: #65a30d;
+    }
+
+    .slovol-chip-red {
+      background: #7f1d1d;
+      color: #fca5a5;
+      border-color: #dc2626;
+    }
+
+    .slovol-quote {
+      padding: 10px 14px;
+      border-left: 3px solid var(--accent);
+      background: var(--bg);
+      border-radius: 0 8px 8px 0;
+      font-style: italic;
+      color: var(--accent-soft);
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border); }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo, useEffect } = React;
+
+    const SUPABASE_URL = 'https://supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_wFor1ik9pKpyHeUnojL4Yw_72mgpHfv';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const FeatherIcon = () => (
+      <svg className="w-5 h-5 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+      </svg>
+    );
+
+    const UserIcon = () => (
+      <svg className="w-4 h-4 inline-block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+    );
+
+    function App() {
+      const [currentUser, setCurrentUser] = useState(null);
+      const [stories, setStories] = useState([]);
+      const [activeStoryId, setActiveStoryId] = useState(null);
+      const [activeTab, setActiveTab] = useState('browse');
+      const [loading, setLoading] = useState(true);
+
+      // Auth state
+      const [authEmail, setAuthEmail] = useState('');
+      const [authPassword, setAuthPassword] = useState('');
+      const [authUsername, setAuthUsername] = useState('');
+      const [isSignUp, setIsSignUp] = useState(false);
+      const [authMessage, setAuthMessage] = useState('');
+
+      // Story Creation Form State
+      const [newTitle, setNewTitle] = useState('');
+      const [newDesc, setNewDesc] = useState('');
+      const [limitType, setLimitType] = useState('word');
+      const [limitValue, setLimitValue] = useState(50);
+      const [turnLimit, setTurnLimit] = useState('');
+      const [visibility, setVisibility] = useState('open'); 
+      const [turnOrderType, setTurnOrderType] = useState('free'); 
+      const [consecutiveMode, setConsecutiveMode] = useState('not_allowed');
+      const [isAnonymous, setIsAnonymous] = useState(false);
+      const [initialPrompt, setInitialPrompt] = useState('');
+
+      // Editor State
+      const [newTurnText, setNewTurnText] = useState('');
+      const [notifyOn, setNotifyOn] = useState(false); 
+
+      // Claim Countdown State
+      const [lockCountdown, setLockCountdown] = useState('');
+
+      useEffect(() => {
+        fetchStories();
+
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          setCurrentUser(session?.user || null);
+          setLoading(false);
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+          setCurrentUser(session?.user || null);
+        });
+
+        return () => subscription.unsubscribe();
+      }, []);
+
+      // Find currently selected story asset object
+      const activeStory = useMemo(() => {
+        return stories.find(s => s.id === activeStoryId) || null;
+      }, [stories, activeStoryId]);
+
+      // Running countdown interval if active story is locked
+      useEffect(() => {
+        if (!activeStory || !activeStory.claim_expires_at) {
+          setLockCountdown('');
+          return;
+        }
+
+        const checkLock = () => {
+          const expires = new Date(activeStory.claim_expires_at).getTime();
+          const now = Date.now();
+          const diff = expires - now;
+
+          if (diff <= 0) {
+            setLockCountdown('');
+            clearInterval(interval);
+          } else {
+            const minutes = Math.floor(diff / 60000);
+            const seconds = Math.floor((diff % 60000) / 1000);
+            setLockCountdown(`${minutes}m ${seconds}s`);
+          }
+        };
+
+        checkLock();
+        const interval = setInterval(checkLock, 1000);
+        return () => clearInterval(interval);
+      }, [activeStory, activeStoryId]);
+
+      // Synchronize notification checkbox every time selected story switches over
+      useEffect(() => {
+        if (currentUser && activeStoryId) {
+          supabase
+            .from('story_subscribers')
+            .select('*')
+            .eq('story_id', activeStoryId)
+            .eq('user_id', currentUser.id)
+            .maybeSingle()
+            .then(({ data }) => {
+              setNotifyOn(!!data);
+            });
+        }
+      }, [activeStoryId, currentUser]);
+
+      const fetchStories = async () => {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('stories')
+          .select('*, story_entries(*)')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching stories:', error);
+        } else if (data) {
+          const formatted = data.map(story => ({
+            ...story,
+            entries: (story.story_entries || []).sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+          }));
+          setStories(formatted);
+          if (formatted.length > 0 && !activeStoryId) {
+            setActiveStoryId(formatted[0].id);
+          }
+        }
+        setLoading(false);
+      };
+
+      // Handle standard Email Auth form flows
+      const handleAuth = async (e) => {
+        e.preventDefault();
+        setAuthMessage('');
+        if (isSignUp) {
+          const { error } = await supabase.auth.signUp({
+            email: authEmail,
+            password: authPassword,
+            options: { data: { username: authUsername } }
+          });
+          if (error) setAuthMessage(error.message);
+          else setAuthMessage('Success! Check your email configuration values for validation links.');
+        } else {
+          const { error } = await supabase.auth.signInWithPassword({
+            email: authEmail,
+
+password: authPassword
+});
+if (error) setAuthMessage(error.message);
+}
+};
+// Feature 3: Sign in with Google Account
+const handleGoogleLogin = async () => {
+const { error } = await supabase.auth.signInWithOAuth({
+provider: 'google',
+options: {
+redirectTo: window.location.origin + '/story'
+}
+});
+if (error) alert(Google Authentication encountered an error: ${error.message});
+};
+const handleLogout = async () => {
+await supabase.auth.signOut();
+};
+// Feature 1: Handle Email Preferences Checklist changes
+const handleNotificationToggle = async (e) => {
+if (!currentUser || !activeStoryId) return;
+const checked = e.target.checked;
+setNotifyOn(checked);
+if (checked) {
+await supabase.from('story_subscribers').insert({
+story_id: activeStoryId,
+user_id: currentUser.id,
+email: currentUser.email
+});
+} else {
+await supabase.from('story_subscribers').delete().match({
+story_id: activeStoryId,
+user_id: currentUser.id
+});
+}
+};
+// Feature 2: Claim turn execution statement block
+const claimNextTurn = async () => {
+if (!currentUser || !activeStoryId) return;
+const durationMinutes = 30;
+const lockString = new Date(Date.now() + durationMinutes * 60000).toISOString();
+const { error } = await supabase
+.from('stories')
+.update({
+claimed_by_user_id: currentUser.id,
+claim_expires_at: lockString
+})
+.eq('id', activeStoryId);
+if (error) {
+alert('Could not secure turn lock. Someone else may have claimed it.');
+} else {
+fetchStories();
+}
+};
+// Handle posting turns and safely clear out claims early on success
+const postNewTurn = async (e) => {
+e.preventDefault();
+if (!newTurnText.trim() || !currentUser || !activeStoryId) return;
+// 1. Post new block to entries table (triggers automated background email workers)
+const { error: entryError } = await supabase.from('story_entries').insert({
+story_id: activeStoryId,
+author_id: currentUser.id,
+author_name: currentUser.user_metadata?.username || currentUser.email.split('@')[0],
+content: newTurnText
+});
+if (entryError) {
+alert(Post rejected by engine database checks: ${entryError.message});
+return;
+}
+// 2. Clear out current reservation logs early on success to restore public execution access
+await supabase
+.from('stories')
+.update({
+claimed_by_user_id: null,
+claim_expires_at: null
+})
+.eq('id', activeStoryId);
+setNewTurnText('');
+fetchStories();
+};
+const createNewStory = async (e) => {
+e.preventDefault();
+if (!newTitle.trim() || !currentUser) return;
+const { data, error } = await supabase.from('stories').insert({
+title: newTitle,
+description: newDesc,
+creator_id: currentUser.id,
+limit_type: limitType,
+limit_value: parseInt(limitValue),
+turn_limit: turnLimit ? parseInt(turnLimit) : null,
+visibility: visibility,
+turn_order_type: turnOrderType,
+consecutive_mode: consecutiveMode,
+is_anonymous: isAnonymous,
+is_closed: false
+}).select().single();
+if (error) {
+alert(error.message);
+} else {
+if (initialPrompt.trim() && data) {
+await supabase.from('story_entries').insert({
+story_id: data.id,
+author_id: currentUser.id,
+author_name: currentUser.user_metadata?.username || currentUser.email.split('@')[0],
+content: initialPrompt
+});
+}
+// Clear layout and return view root
+setNewTitle('');
+setNewDesc('');
+setInitialPrompt('');
+setActiveTab('browse');
+fetchStories();
+}
+};
+const visibleStories = useMemo(() => {
+return stories.filter(s => {
+const vis = s.visibility || 'open';
+if (vis === 'open' || vis === 'closed') return true;
+if (vis === 'hidden') {
+if (!currentUser) return false;
+return s.creator_id === currentUser.id;
+}
+return true;
+});
+}, [stories, currentUser]);
+// Figure out if writing screen inputs match lock parameters
+const isLockedForMe = useMemo(() => {
+if (!activeStory || !activeStory.claim_expires_at) return false;
+const isExpired = new Date(activeStory.claim_expires_at).getTime() < Date.now();
+if (isExpired) return false;
+return activeStory.claimed_by_user_id !== currentUser?.id;
+}, [activeStory, currentUser]);
+return (
+
+{/* Main Navigation Header */}
+
+Sinvol Chain Stories
+
+<button
+onClick={() => setActiveTab('browse')}
+className={slovol-btn ${activeTab === 'browse' ? 'slovol-btn-primary' : ''}}
+>
+Browse Stories
+
+{currentUser && (
+<button
+onClick={() => setActiveTab('create')}
+className={slovol-btn ${activeTab === 'create' ? 'slovol-btn-primary' : ''}}
+>
+Create New Story
+
+)}
+{currentUser ? (
+
+ {currentUser.user_metadata?.username || currentUser.email}
+Logout
+
+) : (
+<button onClick={() => setActiveTab('auth')} className="slovol-btn slovol-btn-primary">Login / Sign Up
+)}
+
+{loading && Synchronizing data pipelines...}
+{!loading && activeTab === 'auth' && (
+
+{isSignUp ? 'Create Account' : 'Welcome Back'}
+{/* Feature 3: Integrated Google Authorization Interface Button */}
+
+
+
+
+
+
+
+Continue with Google
+Or Email
+
+{isSignUp && (
+Username
+<input type="text" value={authUsername} onChange={e => setAuthUsername(e.target.value)} className="slovol-input" required />
+
+)}
+Email
+<input type="email" value={authEmail} onChange={e => setAuthEmail(e.target.value)} className="slovol-input" required />
+
+Password
+<input type="password" value={authPassword} onChange={e => setAuthPassword(e.target.value)} className="slovol-input" required />
+
+{authMessage && {authMessage}}
+
+{isSignUp ? 'Register Account' : 'Sign In'}
+
+
+
+<button onClick={() => setIsSignUp(!isSignUp)} className="text-sm text-gray-400 hover:underline">
+{isSignUp ? 'Already registered? Login instead' : 'Need an account? Sign up here'}
+
+
+
+)}
+{!loading && activeTab === 'create' && (
+
+Assemble New Story Ecosystem
+
+Ecosystem Title
+<input type="text" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="slovol-input" placeholder="The Infinite Horizon..." required />
+
+Concept Summary Description
+<textarea value={newDesc} onChange={e => setNewDesc(e.target.value)} className="slovol-textarea h-24" placeholder="An exploration of alternate history timelines...">
+
+
+Turn Constraint Type
+<select value={limitType} onChange={e => setLimitType(e.target.value)} className="slovol-select">
+Word Count Limit
+Character Count Limit
+
+
+Maximum Bounds Value
+<input type="number" value={limitValue} onChange={e => setLimitValue(e.target.value)} className="slovol-input" min="1" required />
+
+
+
+Ecosystem Lifespan (Total Turn Limit)
+<input type="number" value={turnLimit} onChange={e => setTurnLimit(e.target.value)} className="slovol-input" placeholder="Infinite if left blank" />
+
+Visibility Matrix
+<select value={visibility} onChange={e => setVisibility(e.target.value)} className="slovol-select">
+Open (Publicly Readable)
+Closed (Whitelisted Contributors)
+Hidden (Invisible to Public)
+
+
+
+
+Turn Progression Sequence
+<select value={turnOrderType} onChange={e => setTurnOrderType(e.target.value)} className="slovol-select">
+Free for All
+Round-Robin Rotation
+
+
+Consecutive Contributions
+<select value={consecutiveMode} onChange={e => setConsecutiveMode(e.target.value)} className="slovol-select">
+Block Back-to-Back Entries
+Allow Infinite Sequences
+
+
+
+Ecosystem Ignition Prompt (First Entry)
+<textarea value={initialPrompt} onChange={e => setInitialPrompt(e.target.value)} className="slovol-textarea h-32" placeholder="It began with a spark in the lower transmission core...">
+
+
+Ignite Story Matrix
+
+
+)}
+{!loading && activeTab === 'browse' && (
+
+{/* Sidebar List Overview */}
+
+Active Matrices
+{visibleStories.map(story => (
+<div
+key={story.id}
+onClick={() => setActiveStoryId(story.id)}
+className={slovol-card cursor-pointer hover:border-gray-500 transition duration-150 ${story.id === activeStoryId ? 'active' : ''}}
+>
+{story.title}
+{story.entries?.length || 0} {story.entries?.length === 1 ? 'turn' : 'turns'}
+{story.description || 'No summary context registered.'}
+
+))}
+{/* Main Reading/Writing Area */}
+
+{activeStory ? (
+
+
+{activeStory.title}
+{activeStory.description}
+{/* Feature 1: Subscriptions Preference Checkbox */}
+{currentUser && (
+
+Notify me on new turns
+)}
+{/* Book Text Logs Block */}
+
+{activeStory.entries?.length > 0 ? (
+activeStory.entries.map((entry, idx) => (
+
+
+Turn #{idx + 1} — {entry.author_name}
+{new Date(entry.created_at).toLocaleString()}
+
+{entry.content}
+
+))
+) : (
+This story matrix is completely empty.
+)}
+{/* Feature 2: Lock Claim Reservation Interface Section */}
+
+{currentUser ? (
+isLockedForMe ? (
+
+Matrix Secured by Another Contributor
+This turn slot is currently claimed. Public access will automatically unlock in:
+{lockCountdown || 'Unlocking...'}
+
+) : (
+
+Construct Next Turn Layer ({activeStory.limit_value} {activeStory.limit_type}s max)
+{/* Claim validation UI button logic */}
+{activeStory.claim_expires_at && lockCountdown ? (
+You hold the lock! Time remaining: {lockCountdown}
+) : (
+
+🔒 Claim Next Turn Slot (30m Lock)
+
+)}
+<textarea
+value={newTurnText}
+onChange={e => setNewTurnText(e.target.value)}
+className="slovol-textarea h-32 focus:ring-2 focus:ring-amber-400"
+placeholder="Type your next turn block contribution directly here..."
+required
+/>
+Transmit Turn Layer
+
+
+)
+) : (
+
+You must be logged in to claim turns or contribute layers.
+<button onClick={() => setActiveTab('auth')} className="slovol-btn slovol-btn-primary text-xs">Login / Register Now
+
+)}
+
+
+) : (
+
+Select a story matrix from the sidebar layout overview to begin reading.
+
+)}
+
+
+)}
+
+);
+}
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render();
