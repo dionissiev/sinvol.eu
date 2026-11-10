@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangle/config-schema.json",
-  "name": "sinvol.eu",
+  "name": "sinvol-eu",
   "compatibility_date": "2026-11-10",
   "assets": {
     "directory": "."
