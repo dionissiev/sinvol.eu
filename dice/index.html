@@ -28,9 +28,21 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   .panel { max-width:900px; margin:0 auto; }
   .board { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:12px; }
   .player { background:#1f2937; border-radius:12px; padding:12px; border:2px solid transparent; }
+  .scoreboard { background:#1f2937; border-radius:12px; padding:10px 14px; margin-bottom:12px;
+                display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:12px; }
+  .sbSide { text-align:center; min-width:0; }
+  .sbSide.left { text-align:right; } .sbSide.right { text-align:left; }
+  .sbSide.active .sbName { color:#fbbf24; }
+  .sbName { font-weight:700; font-size:.95rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sbChar { color:#9ca3af; font-size:.75rem; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sbScore { font-size:3rem; font-weight:800; line-height:1; letter-spacing:.02em; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .sbScore .sep { color:#6b7280; font-size:2rem; font-weight:400; margin:0 .25em; vertical-align:middle; }
   .player.active { border-color:#fbbf24; }
   .player h2 { font-size:1rem; margin-bottom:8px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:4px;}
   .player h2 .score { color:#9ca3af; font-weight:400; font-size:.8rem; }
+  .player h2 .score .scoreLine { color:#e5e7eb; font-size:.9rem; }
+  .player h2 .score .scoreLine b { font-size:1.05rem; color:#fbbf24; }
+  .player h2 .score .scoreDetail { margin-top:2px; font-size:.72rem; color:#9ca3af; }
   .dice { display:flex; flex-wrap:wrap; gap:8px; }
   .die { width:62px; height:62px; display:flex; align-items:center; justify-content:center;
          font-weight:700; font-size:1.37rem; color:#fff; position:relative; cursor:pointer; user-select:none;
@@ -39,6 +51,15 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   .die svg.shape { position:absolute; inset:0; width:100%; height:100%; }
   .die .val { position:relative; color:#fff; }
   .die .size { position:absolute; bottom:1px; left:0; right:0; text-align:center; font-size:.6rem; opacity:.85; z-index:1; color:#fff; }
+  /* Die + its type label stacked beneath it */
+  .dieWrap { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .dieLabel { font-size:.62rem; font-weight:600; letter-spacing:.02em; padding:2px 7px; border-radius:6px;
+              background:#111827; color:#d1d5db; border:1px solid #374151; white-space:nowrap; }
+  .dieLabel.shadow { color:#c4b5fd; border-color:#7c3aed; }
+  .dieLabel.trip   { color:#fcd34d; border-color:#d97706; }
+  .dieLabel.poison { color:#bef264; border-color:#65a30d; }
+  .dieLabel.swing  { color:#93c5fd; border-color:#3b82f6; }
+  .dieLabel.dead   { opacity:.4; }
   .die.sel { outline:3px solid #fbbf24; outline-offset:2px; }
   .die.target { outline:3px solid #ef4444; outline-offset:2px; animation:pulse 0.7s ease-in-out 2; }
   .die.rerolled { animation:flashNew 1s ease-out 1; }
@@ -305,13 +326,24 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 </div>
 
 <div class="panel" id="game" style="display:none">
+  <div class="scoreboard" id="scoreboard">
+    <div class="sbSide left" id="sb1">
+      <div class="sbName" id="sb1name"></div>
+      <div class="sbChar" id="sb1char"></div>
+    </div>
+    <div class="sbScore" id="sbScore"><span id="sb1rounds">0</span><span class="sep">:</span><span id="sb2rounds">0</span></div>
+    <div class="sbSide right" id="sb2">
+      <div class="sbName" id="sb2name"></div>
+      <div class="sbChar" id="sb2char"></div>
+    </div>
+  </div>
   <div class="board">
     <div class="player p1" id="p1box">
-      <h2><span id="p1name"></span><span class="score" id="p1score"></span></h2>
+      <h2><span class="score" id="p1score"></span></h2>
       <div class="dice" id="p1dice"></div>
     </div>
     <div class="player p2" id="p2box">
-      <h2><span id="p2name"></span><span class="score" id="p2score"></span></h2>
+      <h2><span class="score" id="p2score"></span></h2>
       <div class="dice" id="p2dice"></div>
     </div>
   </div>
@@ -1652,7 +1684,6 @@ function startRound() {
 
 function render() {
   for (const [i,p] of [[1,G.p1],[2,G.p2]]) {
-    document.getElementById(`p${i}name`).textContent = `${p.name} — ${p.btnName}`;
     const live = p.dice.filter(d=>!d.captured);
     const kept = live.reduce((s,d)=>s + (d.special==="poison"?-1:1)*Math.ceil(d.sides/2),0);
     const cap  = p.captured.reduce((s,d)=>s + (d.special==="poison"?-1:1)*d.sides,0);
@@ -1660,17 +1691,23 @@ function render() {
     const capParts = p.captured.filter(d=>d.special!=="poison").map(d=>d.sides);
     const capNeg   = p.captured.filter(d=>d.special==="poison").map(d=>`-${d.sides}p`);
     const capStr   = capParts.length || capNeg.length
-      ? ` (captured ${cap} = ${capParts.join(" + ") || "0"}${capNeg.length ? " " + capNeg.join(" ") : ""})`
-      : " (no captures)";
+      ? `captured ${cap} = ${capParts.join(" + ") || "0"}${capNeg.length ? " " + capNeg.join(" ") : ""}`
+      : "no captures";
     const livePos  = live.filter(d=>d.special!=="poison").map(d=>Math.ceil(d.sides/2));
     const liveNeg  = live.filter(d=>d.special==="poison").map(d=>`-${Math.ceil(d.sides/2)}p`);
     const keptStr  = livePos.length || liveNeg.length
-      ? ` + kept ${kept} = ${livePos.join(" + ") || "0"}${liveNeg.length ? " " + liveNeg.join(" ") : ""}`
-      : " (nothing kept)";
-    document.getElementById(`p${i}score`).textContent =
-      (G.roundOver || G.over)
-        ? `Rounds won: ${p.rounds} · Round score: ${cap+kept} —${capStr}${keptStr}`
-        : `Rounds won: ${p.rounds} · Score so far: ${cap+kept} —${capStr}${keptStr}`;
+      ? `kept ${kept} = ${livePos.join(" + ") || "0"}${liveNeg.length ? " " + liveNeg.join(" ") : ""}`
+      : "nothing kept";
+    document.getElementById(`p${i}score`).innerHTML =
+      `<div class="scoreLine">Current score: <b>${cap+kept}</b></div>` +
+      `<div class="scoreDetail">${capStr}</div>` +
+      `<div class="scoreDetail">${keptStr}</div>`;
+    // Scoreboard panel above the board — football-style rounds score in the middle
+    const sb = document.getElementById(`sb${i}`);
+    document.getElementById(`sb${i}name`).textContent = p.name;
+    document.getElementById(`sb${i}char`).textContent = p.btnName || "";
+    document.getElementById(`sb${i}rounds`).textContent = p.rounds;
+    sb.classList.toggle("active", G && G.turn === p && !G.over && !G.roundOver);
     document.getElementById(`p${i}box`).classList.toggle("active", G && G.turn===p && !G.over && !G.roundOver);
     const box = document.getElementById(`p${i}dice`);
     box.innerHTML = "";
@@ -1698,7 +1735,7 @@ function render() {
       // On re-renders mid-spin, resume the animation from where it was (negative
       // delay) instead of restarting it — otherwise the die seems to roll twice.
       if (spinningNow) el.style.animationDelay = `-${Math.round(spinElapsed)}ms, 0s`;
-      const typeTag = d.special === "shadow" ? " s" : d.special === "trip" ? " t" : d.special === "poison" ? " p" : "";
+      const typeTag = d.special === "shadow" ? "S" : d.special === "trip" ? "T" : d.special === "poison" ? "P" : "";
       const typeClass = d.special === "shadow" ? " shadow" : d.special === "trip" ? " trip" : d.special === "poison" ? " poison" : "";
       el.className = "die" + typeClass + (d.captured ? " dead" : "") + (selected ? " sel" : "") + (targeted ? " target" : "") + (rerolled ? " rerolled" : "") + (spinning ? " rolling" : "");
       if (d.captured) { el.title = "captured by opponent"; }
@@ -1726,15 +1763,16 @@ function render() {
       val.className = "val";
       val.textContent = d.captured ? "✕" : d.value;
       el.appendChild(val);
-      if (!d.captured) {
-        const size = document.createElement("span");
-        size.className = "size";
-        size.textContent = `d${d.sides}${d.swing && d.swing !== "C" ? " " + d.swing : typeTag}`;
-        el.appendChild(size);
-      }
+      const wrap = document.createElement("div");
+      wrap.className = "dieWrap";
+      wrap.appendChild(el);
+      const label = document.createElement("span");
+      label.className = "dieLabel" + typeClass + (d.captured ? " dead" : "");
+      label.textContent = `${typeTag ? typeTag + " " : ""}d${d.sides}${d.swing && d.swing !== "C" ? " (" + d.swing + ")" : ""}`;
+      wrap.appendChild(label);
       if (!d.captured && G && !G.over && !G.roundOver) el.onclick = () => selectDie(p, idx);
       if (rerolled) setTimeout(() => { if (G) { G.flashDone = G.flashDone||[]; G.flashDone.push(p.name+idx); } }, 1000);
-      box.appendChild(el);
+      box.appendChild(wrap);
     });
   }
   const st = document.getElementById("status");
