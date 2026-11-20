@@ -59,6 +59,8 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   .dieLabel.trip   { color:#fcd34d; border-color:#d97706; }
   .dieLabel.poison { color:#bef264; border-color:#65a30d; }
   .dieLabel.rush   { color:#67e8f9; border-color:#0891b2; }
+  .dieLabel.konstant { color:#e5e7eb; border-color:#9ca3af; }
+  .dieLabel.lucky  { color:#fda4af; border-color:#e11d48; }
   .dieLabel.swing  { color:#93c5fd; border-color:#3b82f6; }
   .dieLabel.dead   { opacity:.4; }
   .die.sel { outline:3px solid #fbbf24; outline-offset:2px; }
@@ -73,6 +75,9 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   @keyframes coinSpin { from { transform:rotateY(0deg); } to { transform:rotateY(1440deg); } }
   @keyframes flashNew { 0% { box-shadow:0 0 0 4px #22d3ee; filter:brightness(1.6); } 100% { box-shadow:0 2px 6px rgba(0,0,0,.4); filter:none; } }
   @keyframes pulse { 50% { transform:scale(1.12); } }
+  /* Lucky-die optional second reroll: pulsating rose outline until decided. */
+  .die.rerollable { outline:3px solid #fb7185; cursor:pointer; animation:luckyPulse 1s ease-in-out infinite; }
+  @keyframes luckyPulse { 50% { box-shadow:0 0 0 6px rgba(251,113,133,.45); transform:scale(1.06); } }
   .die.dead { opacity:.3; cursor:default; color:#374151 !important; }
   .p1 .die:not(.dead) { color:var(--p1); } .p2 .die:not(.dead) { color:var(--p2); }
   /* Colour classes now set `color`, which the SVG polygon fills via currentColor. */
@@ -175,6 +180,8 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
   .miniDie.trip   { background:#d97706; border-color:#f59e0b; color:#fff; }
   .miniDie.poison { background:#65a30d; border-color:#84cc16; color:#fff; }
   .miniDie.rush   { background:#0e7490; border-color:#06b6d4; color:#fff; }
+  .miniDie.konstant { background:#374151; border-color:#9ca3af; color:#f9fafb; }
+  .miniDie.lucky  { background:#be123c; border-color:#fb7185; color:#fff; }
   .miniDie.swing  { background:#1e3a8a; border-color:#3b82f6; color:#dbeafe; }
   /* Win popup */
   .modalOverlay { position:fixed; inset:0; background:rgba(0,0,0,.72); display:flex; align-items:center;
@@ -273,7 +280,7 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     <div class="progFill" id="campProgFill"></div>
     <div class="progText" id="campProgText">0/66</div>
   </div>
-  <div class="progLegend">Dice: grey = regular · <span style="color:#a78bfa">purple = shadow</span> · <span style="color:#fbbf24">amber = trip</span> · <span style="color:#a3e635">green = poison</span> · <span style="color:#22d3ee">cyan = rush</span> · <span style="color:#93c5fd">blue = swing</span> (size chosen at setup)</div>
+  <div class="progLegend">Dice: grey = regular · <span style="color:#a78bfa">purple = shadow</span> · <span style="color:#fbbf24">amber = trip</span> · <span style="color:#a3e635">green = poison</span> · <span style="color:#22d3ee">cyan = rush</span> · <span style="color:#9ca3af">grey = konstant</span> · <span style="color:#fb7185">rose = lucky</span> · <span style="color:#93c5fd">blue = swing</span> (size chosen at setup)</div>
   <div class="cardGrid" id="campGrid"></div>
 </div>
 
@@ -308,7 +315,9 @@ const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
     <div class="recipe" style="margin-top:10px;line-height:1.5">
       <b style="color:#7c3aed">Shadow die (s):</b> can't Power attack. Instead it captures any enemy die showing a value <b>≥ its own</b> (within the target's range). Skill attacks as normal.<br>
       <b style="color:#d97706">Trip die (t):</b> can make a Trip attack: <b>both dice reroll</b> — you capture if your new roll ≥ theirs. On a miss, both keep their new values. Trip dice don't count for going first.<br>
-      <b style="color:#65a30d">Poison die (p):</b> attacks normally (Power, Trip-style rerolls — never as a Skill helper), but scores <b>negative</b>: whoever captures it scores −its size, and a kept poison die subtracts half its size at round end.
+      <b style="color:#65a30d">Poison die (p):</b> attacks normally (Power, Trip-style rerolls — never as a Skill helper), but scores <b>negative</b>: whoever captures it scores −its size, and a kept poison die subtracts half its size at round end.<br>
+      <b style="color:#9ca3af">Konstant die (k):</b> rolls normally at the start of the round, then <b>keeps that value</b> — it is never re-rolled after an attack. In a Skill attack it adds to the sum, or can be <b>subtracted</b> from it — and either way it then <b>takes on the captured die's value</b>.<br>
+      <b style="color:#fb7185">Lucky die (l):</b> rolls with advantage (roll twice, keep the higher). After it captures a die it may <b>reroll a second time</b> — click the pulsating die to reroll, click anywhere else to keep the value. When a Lucky die is <b>captured</b>, the dice that took it gain that same second reroll for the turn.<br>
     </div>
     <div id="aiBlock">
       <label style="margin-top:12px"><input type="checkbox" id="ai" checked> <span id="aiLabel">Player 2 played by the computer</span></label>
@@ -408,7 +417,7 @@ BUTTON_LIST["Hypatia"]     = { pron:"she", dice:[4,"s8",12,"r10",20],     desc:"
 BUTTON_LIST["Machiavelli"] = { pron:"he", dice:["p6","s6","p8",12,20],   desc:"Shadow and poison entwined — win by deceit.", quotes:["Everyone sees what you appear to be; few experience what you really are.", "It is better to act and repent than not to act and regret.", "Never attempt to win by force what can be won by deception."] };
 BUTTON_LIST["Hobbes"]      = { pron:"he", dice:[4,"p6",8,12,20],        desc:"One poison d6 — powerful, but it will cost someone.", quotes:["Life is nasty, brutish and short.", "The condition of man is a condition of war of everyone against everyone.", "Fear and I were born twins."] };
 BUTTON_LIST["Beauvoir"]    = { pron:"she", dice:["p4","p4",10,12,"X"],   desc:"Twin poison d4s plus an X swing.", quotes:["One is not born, but rather becomes, a woman.", "Change your life today. Don't gamble on the future.", "I am incapable of conceiving infinity, and yet I do not accept finity."] };
-BUTTON_LIST["Custom"]       = { pron:"they", dice:["C","C","C","C","C"],    desc:"Pick type (regular, shadow, trip, poison) and size for each of five dice.", quotes:["Nothing is true; everything is permitted — on the dice table.", "A hero is no braver than an ordinary man, but he is brave five minutes longer.", "Do not go where the path may lead; go instead where there is no path."] };
+BUTTON_LIST["Custom"]       = { pron:"they", dice:["C","C","C","C","C"],    desc:"Pick type (regular, shadow, trip, poison, rush, konstant, lucky) and size for each of five dice.", quotes:["Nothing is true; everything is permitted — on the dice table.", "A hero is no braver than an ordinary man, but he is brave five minutes longer.", "Do not go where the path may lead; go instead where there is no path."] };
 
 // Swing ranges (min–max sides the player may choose).
 const SWING_RANGES = { X:[4,20], V:[2,12], W:[2,16], S:[6,20], U:[1,30], Z:[6,30], Y:[1,20], C:[1,30] };
@@ -609,7 +618,7 @@ function openCampaign() {
 
 // The dice a character brings, as little chips on the campaign card.
 function miniDiceHTML(spec) {
-  const kinds = { s:["shadow","Shadow"], t:["trip","Trip"], p:["poison","Poison"], r:["rush","Rush"] };
+  const kinds = { s:["shadow","Shadow"], t:["trip","Trip"], p:["poison","Poison"], r:["rush","Rush"], k:["konstant","Konstant"], l:["lucky","Lucky"] };
   return `<div class="campDice">` + spec.dice.map(s => {
     if (typeof s === "number")
       return `<span class="miniDie" title="Regular d${s}">d${s}</span>`;
@@ -1339,6 +1348,7 @@ function serializeGame(g) {
     v: 1, p1: pl(g.p1), p2: pl(g.p2),
     turn: g.turn === g.p2 ? 2 : 1,
     round: g.round, over: g.over, roundOver: g.roundOver,
+    pendingRerolls: (g.pendingRerolls || []).map(r => ({ p: r.p === g.p2 ? 2 : 1, idx: r.idx })),
     log: g.log, lastRerolled: (g.lastRerolled || []).map(r => ({ p: r.p === g.p2 ? 2 : 1, idx: r.idx })),
     flashDone: g.flashDone || [], aiLevel: g.aiLevel
   };
@@ -1356,7 +1366,8 @@ function deserializeGame(s) {
     p1, p2, turn: s.turn === 2 ? p2 : p1,
     sel: [], round: s.round, over: s.over, roundOver: s.roundOver,
     log: s.log, lastRerolled: (s.lastRerolled || []).map(r => ({ p: r.p === 2 ? s.p2 : s.p1, idx: r.idx })),
-    flashDone: s.flashDone || [], aiLevel: s.aiLevel
+    flashDone: s.flashDone || [], aiLevel: s.aiLevel,
+    pendingRerolls: (s.pendingRerolls || []).map(r => ({ p: r.p === 2 ? s.p2 : s.p1, idx: r.idx }))
   };
   return g;
 }
@@ -1450,6 +1461,19 @@ async function recordGame() {
 }
 
 function roll(sides) { return 1 + Math.floor(Math.random() * sides); }
+// Roll a die object, honoring its special type.
+// Lucky (l): roll twice, keep the higher. Konstant rolls normally here — its
+// locked value is handled by rerollDie() after attacks.
+function rollDie(d) {
+  if (d && d.special === "lucky") return Math.max(roll(d.sides), roll(d.sides));
+  return roll(d.sides);
+}
+// Re-roll after an attack. Konstant dice never re-roll: they keep the value
+// from the start-of-round roll (a Skill attack instead copies the captured die).
+function rerollDie(d) {
+  if (d && d.special === "konstant") return d.value;
+  return rollDie(d);
+}
 
 function buildSelect(id) {
   const s = document.getElementById(id);
@@ -1472,21 +1496,24 @@ function makePlayer(name, btnName, swingSizes, customTypes) {
     name, btnName, pron: BUTTON_LIST[btnName].pron || "they",
     dice: BUTTON_LIST[btnName].dice.map(s => {
       if (typeof s === "string") {
-        const m = /^([pstr])(\d+)$/.exec(s); // special die: s6 = Shadow d6, t4 = Trip d4, p6 = Poison d6, r8 = Rush d8
-        if (m) return { sides:+m[2], value:roll(+m[2]), captured:false, special:{s:"shadow",t:"trip",p:"poison",r:"rush"}[m[1]] };
+        const m = /^([pstrkl])(\d+)$/.exec(s); // special die: s6 = Shadow d6, t4 = Trip d4, p6 = Poison d6, r8 = Rush d8, k4 = Konstant d4, l6 = Lucky d6
+        if (m) { const d0 = { sides:+m[2], value:0, captured:false, special:{s:"shadow",t:"trip",p:"poison",r:"rush",k:"konstant",l:"lucky"}[m[1]] }; d0.value = rollDie(d0); return d0; }
         // swing die
         const [min,max] = SWING_RANGES[s];
         const sides = (swingSizes && swingSizes[sw] !== undefined) ? swingSizes[sw] : max;
         sw++;
-        const d = { sides, value:roll(sides), captured:false, swing:s, min, max };
+        const d = { sides, value:0, captured:false, swing:s, min, max };
         if (s === "C") {
           const t = (customTypes && customTypes[ct] !== undefined) ? customTypes[ct] : "regular";
           ct++;
           if (t !== "regular") d.special = t;
         }
+        d.value = rollDie(d);
         return d;
       }
-      return { sides:s, value:roll(s), captured:false };
+      const dr = { sides:s, value:0, captured:false };
+      dr.value = rollDie(dr);
+      return dr;
     }),
     rounds:0, captured:[]
   };
@@ -1516,7 +1543,7 @@ function applySwingPickers(selId, boxId) {
     let swIdx = 0;
     spec.dice.forEach((s, i) => {
       if (typeof s !== "string") return;
-      if (/^[pstr]\d+$/.test(s)) return; // special dice (Shadow/Trip/Poison/Rush) need no size picker
+      if (/^[pstrkl]\d+$/.test(s)) return; // special dice (Shadow/Trip/Poison/Rush/Konstant/Lucky) need no size picker
       const [min,max] = SWING_RANGES[s];
       const row = document.createElement("label");
       row.className = "swingRow";
@@ -1532,7 +1559,7 @@ function applySwingPickers(selId, boxId) {
         // Custom die: one dropdown for the type, one for the size.
         const type = document.createElement("select");
         type.id = `${boxId}_ct${idx}`;
-        for (const [val, txt] of [["regular","Regular"],["shadow","Shadow"],["trip","Trip"],["poison","Poison"],["rush","Rush"]]) {
+        for (const [val, txt] of [["regular","Regular"],["shadow","Shadow"],["trip","Trip"],["poison","Poison"],["rush","Rush"],["konstant","Konstant"],["lucky","Lucky"]]) {
           const o = document.createElement("option");
           o.value = val; o.textContent = txt;
           type.appendChild(o);
@@ -1647,6 +1674,54 @@ function log(msg) {
 }
 
 function other(p) { return p === G.p1 ? G.p2 : G.p1; }
+// Lucky-die pending second rerolls.
+// After an attack, Lucky dice that attacked may roll a second time (and, when a
+// Lucky die was captured, the capturing dice gain the same option). Each pulsating
+// die is clicked to reroll; clicking anywhere else cancels the rest.
+function cancelRerolls() {
+  if (!G || !G.pendingRerolls || !G.pendingRerolls.length) return;
+  const names = G.pendingRerolls.map(r => `${r.p.name}'s d${r.p.dice[r.idx].sides}`).join(", ");
+  log(`🍀 ${names}: second reroll declined — value kept.`);
+  G.pendingRerolls = null;
+  G.sel = []; G.targetIdx = null; G.rushFirst = null;
+  render();
+  endTurn();
+  pushState();
+}
+// Decide what happens after an attack resolves: either the turn passes, or one
+// or more dice wait on an optional second reroll.
+function finishAttack(pending) {
+  if (pending.length && !(isAI() && G.turn === G.p2)) {
+    G.pendingRerolls = pending;
+    render();
+    return; // the player decides; endTurn happens on click / cancel
+  }
+  if (pending.length) {
+    // The computer takes the extra reroll whenever its die shows at most half
+    // its size — a free shot at a better number.
+    let i = 0;
+    const step = () => {
+      if (i >= pending.length) { G.pendingRerolls = null; endTurn(); pushState(); return; }
+      const r = pending[i++];
+      const d = r.p.dice[r.idx];
+      if (d && !d.captured && d.value <= d.sides / 2) {
+        const before = d.value;
+        d.value = rollDie(d);
+        forceSpin(r.p, r.idx);
+        log(`🍀 ${r.p.name} rerolls the Lucky d${d.sides} again: ${before} → ${d.value}.`);
+      } else {
+        log(`🍀 ${r.p.name} keeps the Lucky d${d.sides} on ${d ? d.value : "—"}.`);
+      }
+      render();
+      setTimeout(step, 900);
+    };
+    render();
+    setTimeout(step, 900);
+    return;
+  }
+  endTurn();
+  pushState();
+}
 function isAI() { return !!(G && G.ai); }
 
 // Mark a die as spinning from now: the render keeps the animation class for
@@ -1661,12 +1736,12 @@ function forceSpin(p, idx) {
 
 function startRound() {
   // All dice are re-rolled at the start of each round; captured dice return to play.
-  G.p1.dice.forEach(d => { d.captured=false; d.value=roll(d.sides); });
-  G.p2.dice.forEach(d => { d.captured=false; d.value=roll(d.sides); });
+  G.p1.dice.forEach(d => { d.captured=false; d.value=rollDie(d); });
+  G.p2.dice.forEach(d => { d.captured=false; d.value=rollDie(d); });
   G.p1.dice.forEach((d, i) => forceSpin(G.p1, i));
   G.p2.dice.forEach((d, i) => forceSpin(G.p2, i));
   G.p1.captured = []; G.p2.captured = [];
-  G.sel = []; G.roundOver = false; G.rushFirst = null;
+  G.sel = []; G.roundOver = false; G.rushFirst = null; G.pendingRerolls = null;
   log(`— Round ${G.round} — all dice re-rolled.`);
   // Tournament rule: lowest single die goes first; compare next-lowest on ties.
   // Trip dice do not count for going first.
@@ -1739,8 +1814,8 @@ function render() {
       // On re-renders mid-spin, resume the animation from where it was (negative
       // delay) instead of restarting it — otherwise the die seems to roll twice.
       if (spinningNow) el.style.animationDelay = `-${Math.round(spinElapsed)}ms, 0s`;
-      const typeTag = d.special === "shadow" ? "S" : d.special === "trip" ? "T" : d.special === "poison" ? "P" : d.special === "rush" ? "R" : "";
-      const typeClass = d.special === "shadow" ? " shadow" : d.special === "trip" ? " trip" : d.special === "poison" ? " poison" : d.special === "rush" ? " rush" : "";
+      const typeTag = d.special === "shadow" ? "S" : d.special === "trip" ? "T" : d.special === "poison" ? "P" : d.special === "rush" ? "R" : d.special === "konstant" ? "K" : d.special === "lucky" ? "L" : "";
+      const typeClass = d.special === "shadow" ? " shadow" : d.special === "trip" ? " trip" : d.special === "poison" ? " poison" : d.special === "rush" ? " rush" : d.special === "konstant" ? " konstant" : d.special === "lucky" ? " lucky" : "";
       el.className = "die" + typeClass + (d.captured ? " dead" : "") + (selected ? " sel" : "") + (targeted ? " target" : "") + (rerolled ? " rerolled" : "") + (spinning ? " rolling" : "");
       if (d.captured) { el.title = "captured by opponent"; }
       else { el.title = `d${d.sides}`; }
@@ -1774,7 +1849,11 @@ function render() {
       label.className = "dieLabel" + typeClass + (d.captured ? " dead" : "");
       label.textContent = `${typeTag ? typeTag + " " : ""}d${d.sides}${d.swing && d.swing !== "C" ? " (" + d.swing + ")" : ""}`;
       wrap.appendChild(label);
-      if (!d.captured && G && !G.over && !G.roundOver) el.onclick = () => selectDie(p, idx);
+      if (!d.captured && G && !G.over && !G.roundOver) el.onclick = (e) => selectDie(p, idx, e);
+      if (G && G.pendingRerolls && G.pendingRerolls.some(r => r.p === p && r.idx === idx)) {
+        el.classList.add("rerollable");
+        el.title = `Lucky reroll: click to roll again, click elsewhere to keep ${d.value}`;
+      }
       if (rerolled) setTimeout(() => { if (G) { G.flashDone = G.flashDone||[]; G.flashDone.push(p.name+idx); } }, 1000);
       box.appendChild(wrap);
     });
@@ -1787,7 +1866,10 @@ function render() {
   // Highlight Pass when the current (human) player has no legal attack.
   const stuck = !!(G && !G.over && !G.roundOver && !(G.turn===G.p2 && isAI()) && G.turn && !legalAttacks(G.turn).length);
   passBtn.classList.toggle("alert", stuck);
-  if (G.over) {
+  // Pending Lucky second rerolls: tell the player what the pulsating dice mean.
+  if (G && G.pendingRerolls && G.pendingRerolls.length) {
+    st.innerHTML = `<span class="big">🍀 Second reroll available.</span>Click a pulsating Lucky die to roll it again${isAI() && G.turn === G.p2 ? " — the computer is deciding…" : ", or click anywhere else to keep the current values."}`;
+  } else if (G.over) {
     const w = G.p1.rounds>=3 ? G.p1 : G.p2;
     const l = w === G.p1 ? G.p2 : G.p1;
     const qs = BUTTON_LIST[l.btnName].quotes;
@@ -1817,11 +1899,33 @@ function render() {
     st.innerHTML = `<span class="big">Round ${G.round} — ${G.turn.name}'s turn</span>` +
       (G.sel.length
         ? `Selected ${G.sel.length} of your dice${list?` (${list})`:""}. Now click one of ${other(G.turn).name}'s dice to attack it.`
-        : `${G.turn.name}: click one of your dice (Power attack), several (Skill attack) — Shadow (attacks upward), Trip (rerolls both), Poison (scores negative).`);
+        : `${G.turn.name}: click one of your dice (Power attack), several (Skill attack) — Shadow (attacks upward), Trip (rerolls both), Poison (scores negative), Konstant (keeps its roll), Lucky (rerolls high).`);
   }
 }
 
-function selectDie(p, idx) {
+function selectDie(p, idx, e) {
+  // Optional Lucky second rerolls: clicking a pulsating die rerolls it again;
+  // clicking anything else cancels the remaining rerolls and keeps the values.
+  if (G && G.pendingRerolls && G.pendingRerolls.length && !G.aiThinking) {
+    const hit = G.pendingRerolls.find(r => r.p === p && r.idx === idx);
+    if (hit && e) e.stopPropagation();
+    if (hit && (!isOnline() || p === mySide())) {
+      const d = p.dice[idx];
+      const before = d.value;
+      d.value = rollDie(d);
+      forceSpin(p, idx);
+      log(`🍀 ${p.name} takes the second reroll on the Lucky d${d.sides}: ${before} → ${d.value}.`);
+      G.pendingRerolls = G.pendingRerolls.filter(r => !(r.p === p && r.idx === idx));
+      render();
+      if (!G.pendingRerolls.length) { G.pendingRerolls = null; endTurn(); }
+      pushState();
+      return;
+    }
+    // Waiting online opponent: their clicks neither reroll nor cancel.
+    if (isOnline() && p !== mySide()) return;
+    cancelRerolls();
+    return;
+  }
   if (!G || G.over || G.roundOver || G.aiThinking) return;
   if (isOnline() && p !== mySide()) {
     if (G.sel.length) attemptCapture(p, idx);
@@ -1893,7 +1997,16 @@ function attemptCapture(dp, didx) {
     if (!type && A.special === "shadow" && def.value >= A.value && def.value <= def.sides) type = "Shadow";
     else if (!type && A.special !== "shadow" && A.value >= def.value) type = "Power";
     else if (!type && A.special === "trip") type = "Trip";
-  } else if (sum === def.value && !atk.some(d=>d.special==="poison")) type = "Skill";
+  } else if (sum === def.value && !atk.some(d=>d.special==="poison")) {
+    type = "Skill";
+  } else if (atk.length >= 2 && !atk.some(d=>d.special==="poison") &&
+             atk.filter(d=>d.special==="konstant").length === 1) {
+    // Konstant subtraction: one Konstant die may be SUBTRACTED from the other
+    // attackers' sum instead of added — e.g. 12 − k4 captures a die showing 8.
+    const konst = atk.find(d=>d.special==="konstant");
+    const others = sum - konst.value;
+    if (others === def.value && def.value > 0) type = "Skill";
+  }
   if (!type) {
     const msg = `This is not a valid attack. ❌ Attacking d${def.sides} (showing ${def.value}) with [${atk.map(d=>d.value).join(", ")}]. Power: one die ≥ target. Shadow: one shadow die ≤ target. Trip: one trip die (rerolls both). Rush: one rush die = the sum of two targets. Skill: dice must sum exactly.`;
     log(msg);
@@ -1918,7 +2031,7 @@ function performAttack(type, atk, dp, didx, sum, didx2) {
     // The defender's target die + its allied rush die summed to the attacker's
     // value: both defender dice are captured by the single attacker.
     const def2 = dp.dice[didx2];
-    for (const d of atk) d.value = roll(d.sides);
+    for (const d of atk) d.value = rerollDie(d);
     G.lastRerolled = atk.map(d => ({ p:G.turn, idx:G.turn.dice.indexOf(d) }));
     atk.forEach(d => forceSpin(G.turn, G.turn.dice.indexOf(d)));
     G.flashDone = [];
@@ -1928,14 +2041,13 @@ function performAttack(type, atk, dp, didx, sum, didx2) {
     G.sel = [];
     G.targetIdx = null;
     render();
-    endTurn();
-    pushState();
+    finishAttack(luckyPending(atk, def, def2));
     return;
   }
   if (type === "Rush") {
     // One Rush die sweeps two enemy dice whose values summed to its own.
     const def2 = dp.dice[didx2];
-    for (const d of atk) d.value = roll(d.sides);
+    for (const d of atk) d.value = rerollDie(d);
     G.lastRerolled = atk.map(d => ({ p:G.turn, idx:G.turn.dice.indexOf(d) }));
     atk.forEach(d => forceSpin(G.turn, G.turn.dice.indexOf(d)));
     G.flashDone = [];
@@ -1945,13 +2057,12 @@ function performAttack(type, atk, dp, didx, sum, didx2) {
     G.sel = [];
     G.targetIdx = null;
     render();
-    endTurn();
-    pushState();
+    finishAttack(luckyPending(atk, def, def2));
     return;
   }
   if (type === "Trip") {
     // Both dice reroll; capture if the attacker's new roll >= the target's.
-    const na = roll(atk[0].sides), nv = roll(def.sides);
+    const na = rerollDie(atk[0]), nv = rollDie(def);
     atk[0].value = na; def.value = nv;
     G.lastRerolled = [{p:G.turn, idx:G.turn.dice.indexOf(atk[0])}, {p:dp, idx:didx}];
     forceSpin(G.turn, G.turn.dice.indexOf(atk[0]));
@@ -1963,23 +2074,37 @@ function performAttack(type, atk, dp, didx, sum, didx2) {
     G.sel = [];
     G.targetIdx = null;
     render();
-    endTurn();
-    pushState();
+    finishAttack(luckyPending(atk, def));
     return;
   }
-  for (const d of atk) d.value = roll(d.sides);
+  for (const d of atk) d.value = rerollDie(d);
   G.lastRerolled = atk.map(d => ({ p:G.turn, idx:G.turn.dice.indexOf(d) }));
   atk.forEach(d => forceSpin(G.turn, G.turn.dice.indexOf(d)));
   G.flashDone = [];
   def.captured = true;
   G.turn.captured.push(def);
+  // A Konstant die used in a Skill attack takes on the captured die's value;
+  // in Power/Shadow attacks it simply keeps its start-of-round roll.
+  for (const d of atk) if (d.special === "konstant" && type === "Skill") d.value = def.value;
   const flavor = type === "Shadow" ? " (attacks upward)" : "";
-  log(`⚔️ ${G.turn.name} ${type} attack${flavor}: [${used.join(type==="Skill" ? " + " : ", ")}] captures ${other(G.turn).name}'s d${def.sides} (showing ${def.value}).${type==="Skill" ? " Sum: " + sum + "." : ""} Attacker re-rolled to [${atk.map(d=>d.value).join(", ")}].`);
+  log(`⚔️ ${G.turn.name} ${type} attack${flavor}: [${used.join(type==="Skill" ? " + " : ", ")}] captures ${other(G.turn).name}'s d${def.sides} (showing ${def.value}).${type==="Skill" ? (sum === def.value ? " Sum: " + sum + "." : ` ${sum} − ${atk.find(d=>d.special==="konstant").value} = ${def.value}.`) : ""} Attacker re-rolled to [${atk.map(d=>d.value).join(", ")}].`);
   G.sel = [];            // highlight expires: dice were used and re-rolled
   G.targetIdx = null;
   render();
-  endTurn();
-  pushState();
+  finishAttack(luckyPending(atk, def));
+}
+// Dice that may take an optional second reroll after this attack: every Lucky
+// die that attacked, plus — when a Lucky die was captured — every capturing die
+// (they gain the Lucky reroll for this turn).
+function luckyPending(atk, ...captured) {
+  const list = [];
+  const push = d => {
+    const idx = G.turn.dice.indexOf(d);
+    if (idx >= 0 && !list.some(r => r.idx === idx)) list.push({ p:G.turn, idx });
+  };
+  for (const d of atk) if (d.special === "lucky") push(d);
+  if (captured.some(d => d && d.special === "lucky")) for (const d of atk) push(d);
+  return list;
 }
 
 function legalAttacks(p) {
@@ -2011,6 +2136,13 @@ function legalAttacks(p) {
     for (let j=i+1;j<clean.length;j++) {
       const s = clean[i].value + clean[j].value;
       for (const f of foes) if (f.value === s) res.push({type:"Skill", a:[clean[i],clean[j]], t:f});
+      // Konstant subtraction: one Konstant die can be subtracted instead of added.
+      if (clean[i].special === "konstant" || clean[j].special === "konstant") {
+        const konst = clean[i].special === "konstant" ? clean[i] : clean[j];
+        const mate  = konst === clean[i] ? clean[j] : clean[i];
+        const diff = mate.value - konst.value;
+        if (diff > 0) for (const f of foes) if (f.value === diff) res.push({type:"Skill", a:[konst,mate], t:f, sub:true});
+      }
       for (let k=j+1;k<clean.length;k++) {
         const s2 = s + clean[k].value;
         for (const f of foes) if (f.value === s2) res.push({type:"Skill", a:[clean[i],clean[j],clean[k]], t:f});
@@ -2148,7 +2280,7 @@ function chooseAIAttack(atks) {
     const wasCaptured2 = a.t2 ? a.t2.captured : false;
     a.t.captured = true;
     if (a.t2) a.t2.captured = true;
-    for (const d of a.a) d.value = roll(d.sides);
+    for (const d of a.a) d.value = rerollDie(d);
     const reply = bestReplySize(G.p1);
     const noReply = reply === 0;
     // Risk exposure: after this move, which of our dice sit next to our own
@@ -2218,6 +2350,11 @@ document.getElementById("btn1").value = "Socrates";
 document.getElementById("btn2").value = "Epicurus";
 document.getElementById("obtn").value = "Socrates";
 document.getElementById("btn1").onchange = updateSwing;
+// Clicking anywhere outside the dice cancels pending Lucky second rerolls.
+document.addEventListener("click", (e) => {
+  if (G && G.pendingRerolls && G.pendingRerolls.length && !G.aiThinking &&
+      (!isOnline() || G.turn === mySide())) cancelRerolls();
+});
 document.getElementById("btn2").onchange = updateSwing;
 document.getElementById("obtn").onchange = () => { applySwingPickers("obtn", "osw"); refreshOlRecipe(); };
 updateSwing();
