@@ -1708,7 +1708,7 @@ function finishAttack(pending) {
     // its size — a free shot at a better number.
     let i = 0;
     const step = () => {
-      if (i >= pending.length) { G.pendingRerolls = null; endTurn(); pushState(); return; }
+      if (i >= pending.length) { G.pendingRerolls = null; G.rerollUIActive = false; endTurn(); pushState(); return; }
       const r = pending[i++];
       const d = r.p.dice[r.idx];
       if (d && !d.captured && d.value <= d.sides / 2) {
@@ -1748,7 +1748,7 @@ function startRound() {
   G.p1.dice.forEach((d, i) => forceSpin(G.p1, i));
   G.p2.dice.forEach((d, i) => forceSpin(G.p2, i));
   G.p1.captured = []; G.p2.captured = [];
-  G.sel = []; G.roundOver = false; G.rushFirst = null; G.pendingRerolls = null;
+  G.sel = []; G.roundOver = false; G.rushFirst = null; G.pendingRerolls = null; G.rerollUIActive = false;
   log(`— Round ${G.round} — all dice re-rolled.`);
   // Tournament rule: lowest single die goes first; compare next-lowest on ties.
   // Trip dice do not count for going first.
@@ -1924,7 +1924,7 @@ function selectDie(p, idx, e) {
       log(`🍀 ${p.name} takes the second reroll on the Lucky d${d.sides}: ${before} → ${d.value}.`);
       G.pendingRerolls = G.pendingRerolls.filter(r => !(r.p === p && r.idx === idx));
       render();
-      if (!G.pendingRerolls.length) { G.pendingRerolls = null; endTurn(); }
+      if (!G.pendingRerolls.length) { G.pendingRerolls = null; G.rerollUIActive = false; endTurn(); }
       pushState();
       return;
     }
@@ -2159,6 +2159,7 @@ function legalAttacks(p) {
 }
 
 function endTurn() {
+  G.rerollUIActive = false; // never let a stale arm-cancel flag leak into the next attack
   const l1 = G.p1.dice.some(d=>!d.captured);
   const l2 = G.p2.dice.some(d=>!d.captured);
   if (!l1 || !l2) { endRound(); return; }
